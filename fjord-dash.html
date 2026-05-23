@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Towel Day: The Fjord Dash</title>
+    <meta property="og:title" content="Towel Day: The Fjord Dash">
+    <meta property="og:description" content="Help Ford Prefect dash across Slartibartfast's fjords, dodge Vogons, and ignore Marvin. Don't Panic!">
+    <meta property="og:image" content="https://towel-day.czr.one/dash-preview.gif">
+    <meta property="og:url" content="https://towel-day.czr.one/fjord-dash.html">
+    <meta property="og:type" content="website">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100%;
+            max-height: 450px;
+            box-shadow: 0 0 50px rgba(100, 50, 255, 0.6), inset 0 0 30px rgba(0, 255, 255, 0.2);
+            overflow: hidden;
+            border: 2px solid #ff00ff;
+            border-radius: 10px;
+            background: linear-gradient(to bottom, #020111 0%, #20124d 100%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            padding: 15px;
+            box-sizing: border-box;
+            z-index: 3;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #hud {
+            font-weight: bold;
+            font-size: 16px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff, 2px 2px 0px #000;
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        #hud-status {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff, 2px 2px 0px #000;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+        }
+
+        #screens {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 20, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            pointer-events: auto;
+            z-index: 4;
+            backdrop-filter: blur(5px);
+        }
+
+        .large-friendly-letters {
+            color: #ffcc00;
+            font-size: 24px;
+            font-family: 'Press Start 2P', monospace;
+            text-align: center;
+            text-shadow: 0 0 20px #ff0000, 4px 4px 0px #aa0000;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(90deg, #ff00ff, #00ffff);
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-family: 'Press Start 2P', monospace;
+            margin-top: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 4px 15px rgba(255, 0, 255, 0.5);
+            text-shadow: 1px 1px 0 #000;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        button:active { transform: scale(0.95) translateY(4px); box-shadow: 0 0 0 rgba(255, 0, 255, 0); }
+        button:hover { box-shadow: 0 0 25px rgba(0, 255, 255, 0.8); }
+
+        .hidden { display: none !important; }
+
+        #marvin-quote {
+            position: absolute;
+            bottom: 25%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 18px;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 0.5s, transform 0.5s;
+            max-width: 60%;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            pointer-events: none;
+            text-shadow: 0 0 5px #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container" class="crt">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-layer">
+        <div id="hud">SCORE: <span id="scoreDisplay">0</span></div>
+        <div id="hud-status"></div>
+    </div>
+    <div id="marvin-quote">Life? Don't talk to me about life.</div>
+    <div id="screens">
+        <h1 class="large-friendly-letters" id="screenTitle">THE FJORD DASH</h1>
+        <p id="screenText" style="line-height: 1.6; color: #aaddff; text-shadow: 0 0 5px #00ffff;">
+            Play as Ford Prefect. Jump over Slartibartfast's newly carved fjords.<br><br>
+            Collect Towels (🟦) and Tea (☕).<br>
+            Avoid Vogons (👽) and Zaphod (👱‍♂️🛸).<br>
+            Ignore Marvin (🤖).<br><br>
+            Press <b>SPACE</b> or <b>TAP</b> to Jump / Double Jump.
+        </p>
+        <button id="actionBtn">DON'T PANIC (START)</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const screens = document.getElementById('screens');
+    const screenTitle = document.getElementById('screenTitle');
+    const screenText = document.getElementById('screenText');
+    const actionBtn = document.getElementById('actionBtn');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const hudStatus = document.getElementById('hud-status');
+    const marvinQuoteEl = document.getElementById('marvin-quote');
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Web Audio Engine
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+    
+    function initAudio() {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (type === 'jump') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'pickup') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        } else if (type === 'tea') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        } else if (type === 'vogon') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.4);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        } else if (type === 'crash') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.5);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+        }
+    }
+
+    const MARVIN_QUOTES = [
+        "Life? Don't talk to me about life.",
+        "Here I am, brain the size of a planet...",
+        "I think you ought to know I'm feeling very depressed.",
+        "Pardon me for breathing, which I never do anyway.",
+        "I could calculate your chance of survival, but you won't like it."
+    ];
+
+    let state = 'START';
+    let animationId;
+    let score = 0;
+    let baseSpeed = 5;
+    let globalSpeed = baseSpeed;
+    let frameCount = 0;
+    let groundY = 0;
+    let terrain = [];
+    let bgStars = [];
+
+    const EMOJI_SIZE = 40;
+
+    const player = {
+        x: 100, y: 0,
+        vy: 0, gravity: 0.6,
+        jumpForce: -12,
+        isGrounded: true,
+        jumps: 0,
+        statusEffect: 0
+    };
+
+    let entities = [];
+    let backgroundChars = [];
+    let particles = [];
+
+    function initStars() {
+        bgStars = [];
+        for (let i = 0; i < 100; i++) {
+            bgStars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                z: Math.random() * 2 + 0.5,
+                size: Math.random() * 2 + 1,
+                color: Math.random() > 0.5 ? '#00ffff' : '#ff00ff'
+            });
+        }
+    }
+
+    function resetGame() {
+        score = 0;
+        frameCount = 0;
+        baseSpeed = 5;
+        globalSpeed = baseSpeed;
+        groundY = canvas.height - 80;
+        
+        player.y = groundY - EMOJI_SIZE;
+        player.vy = 0;
+        player.jumps = 0;
+        player.statusEffect = 0;
+        
+        initStars();
+        terrain = [];
+        for(let i=0; i<canvas.width + 100; i+=20) {
+            terrain.push({ x: i, isGap: false });
+        }
+
+        entities = [];
+        backgroundChars = [
+            { type: 'slartibartfast', x: canvas.width - 100, y: groundY - 100, vy: 0.5, float: 0 },
+            { type: 'marvin', x: 20, y: groundY - 150, float: 0 }
+        ];
+        particles = [];
+        marvinQuoteEl.style.opacity = 0;
+        marvinQuoteEl.style.transform = 'translateX(-50%) translateY(20px)';
+        hudStatus.innerText = "";
+        updateHUD();
+    }
+
+    function jump() {
+        if (state !== 'PLAYING') return;
+        if (player.jumps < 2) {
+            player.vy = player.jumpForce;
+            player.jumps++;
+            player.isGrounded = false;
+            playSound('jump');
+            createParticles(player.x + 20, player.y + 40, '#00ffff', 15);
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            jump();
+        }
+    });
+    canvas.addEventListener('mousedown', jump);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); }, {passive: false});
+
+    actionBtn.addEventListener('click', () => {
+        initAudio();
+        if (state === 'START' || state === 'GAMEOVER') {
+            resetGame();
+            state = 'PLAYING';
+            screens.classList.add('hidden');
+            gameLoop();
+        }
+    });
+
+    function spawnEntity() {
+        const r = Math.random();
+        let type = 'towel';
+        let y = groundY - EMOJI_SIZE - 10;
+        
+        if (r < 0.1) {
+            type = 'vogon';
+            y = groundY - EMOJI_SIZE + 5;
+        } else if (r < 0.15) {
+            type = 'tea';
+            y = groundY - EMOJI_SIZE - 40 - Math.random() * 50;
+        } else if (r < 0.25) {
+            type = 'zaphod';
+            y = Math.random() * (canvas.height / 2);
+        } else if (r < 0.5) {
+            type = 'towel';
+            y = groundY - EMOJI_SIZE - 10 - Math.random() * 80;
+        } else {
+            return;
+        }
+
+        entities.push({
+            type: type,
+            x: canvas.width + 50,
+            y: y,
+            collected: false
+        });
+    }
+
+    function createParticles(x, y, color, count=10) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 20 + Math.random() * 20,
+                maxLife: 40,
+                color: color
+            });
+        }
+    }
+
+    function drawGlowEmoji(emoji, x, y, size, blurColor, blurSize=20) {
+        ctx.save();
+        ctx.font = `${size}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.shadowBlur = blurSize;
+        ctx.shadowColor = blurColor;
+        ctx.fillText(emoji, x, y);
+        // Draw twice to intensify the emoji core while keeping glow
+        ctx.shadowBlur = 0;
+        ctx.fillText(emoji, x, y);
+        ctx.restore();
+    }
+
+    function update() {
+        baseSpeed = 5 + (score / 50);
+        globalSpeed = player.statusEffect > 0 ? baseSpeed * 0.5 : baseSpeed; 
+        
+        if (player.statusEffect > 0) player.statusEffect--;
+
+        frameCount++;
+
+        bgStars.forEach(star => {
+            star.x -= globalSpeed * star.z * 0.2;
+            if (star.x < -10) star.x = canvas.width + 10;
+        });
+
+        for(let i=0; i<terrain.length; i++) {
+            terrain[i].x -= globalSpeed;
+        }
+        
+        while (terrain.length > 0 && terrain[0].x < -50) {
+            terrain.shift();
+        }
+        
+        let lastT = terrain[terrain.length - 1];
+        while (lastT.x < canvas.width + 100) {
+            let isGap = false;
+            if (frameCount > 100 && Math.random() < 0.05 && !lastT.isGap) {
+                let gapWidth = Math.floor(Math.random() * 4) + 3;
+                for(let g=0; g<gapWidth; g++) {
+                    terrain.push({ x: lastT.x + 20, isGap: true });
+                    lastT = terrain[terrain.length - 1];
+                }
+            } else {
+                terrain.push({ x: lastT.x + 20, isGap: false });
+            }
+            lastT = terrain[terrain.length - 1];
+        }
+
+        if (frameCount % 60 === 0) spawnEntity();
+
+        for (let i = entities.length - 1; i >= 0; i--) {
+            let ent = entities[i];
+            ent.x -= globalSpeed * (ent.type === 'zaphod' ? 1.5 : 1);
+
+            if (!ent.collected && Math.abs(ent.x - player.x) < 30 && Math.abs(ent.y - player.y) < 30) {
+                ent.collected = true;
+                if (ent.type === 'towel') {
+                    score += 10;
+                    playSound('pickup');
+                    createParticles(ent.x, ent.y, '#00ffff');
+                } else if (ent.type === 'tea') {
+                    score += 25;
+                    playSound('tea');
+                    player.statusEffect = 0; 
+                    createParticles(ent.x, ent.y, '#ffff00', 30);
+                    hudStatus.innerText = "Tea! Speed Restored.";
+                    setTimeout(()=> hudStatus.innerText="", 1500);
+                } else if (ent.type === 'vogon') {
+                    playSound('vogon');
+                    player.statusEffect = 180; 
+                    createParticles(ent.x, ent.y, '#ff00ff', 30);
+                    hudStatus.innerText = "Vogon Poetry! Slowed down.";
+                    setTimeout(()=> {if(player.statusEffect<=0) hudStatus.innerText="";}, 3000);
+                }
+            }
+
+            if (ent.x < -100 || ent.collected) {
+                entities.splice(i, 1);
+            }
+        }
+
+        backgroundChars.forEach(c => {
+            c.float += 0.05;
+            if (c.type === 'slartibartfast') {
+                c.y += c.vy;
+                if (c.y > groundY - 80 || c.y < groundY - 150) c.vy *= -1;
+            }
+        });
+
+        if (Math.random() < 0.005 && marvinQuoteEl.style.opacity === '0') {
+            marvinQuoteEl.innerText = MARVIN_QUOTES[Math.floor(Math.random() * MARVIN_QUOTES.length)];
+            marvinQuoteEl.style.opacity = 1;
+            marvinQuoteEl.style.transform = 'translateX(-50%) translateY(0)';
+            setTimeout(() => {
+                marvinQuoteEl.style.opacity = 0;
+                marvinQuoteEl.style.transform = 'translateX(-50%) translateY(20px)';
+            }, 4000);
+        }
+
+        particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+        });
+        particles = particles.filter(p => p.life > 0);
+
+        player.vy += player.gravity;
+        player.y += player.vy;
+
+        let overGap = false;
+        for(let t of terrain) {
+            if (t.x >= player.x - 10 && t.x <= player.x + 20) {
+                if (t.isGap) overGap = true;
+            }
+        }
+
+        if (player.y >= groundY - EMOJI_SIZE && !overGap) {
+            player.y = groundY - EMOJI_SIZE;
+            player.vy = 0;
+            player.jumps = 0;
+            player.isGrounded = true;
+        }
+
+        // Add running particle trail
+        if (player.isGrounded && frameCount % 3 === 0) {
+            createParticles(player.x, player.y + 35, '#ff00ff', 1);
+        }
+
+        if (player.y > canvas.height) {
+            playSound('crash');
+            gameOver("You fell into one of Slartibartfast's award-winning fjords.");
+        }
+
+        updateHUD();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Parallax Stars
+        bgStars.forEach(star => {
+            ctx.fillStyle = star.color;
+            ctx.globalAlpha = (Math.sin(frameCount / 10 + star.x) + 1) / 2 * 0.8 + 0.2;
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+
+        // Draw Synthwave Grid Terrain
+        const neonCyan = '#00ffff';
+        const neonPink = '#ff00ff';
+        const voidColor = '#05021a';
+
+        terrain.forEach(t => {
+            if (!t.isGap) {
+                // Ground fill
+                let grad = ctx.createLinearGradient(0, groundY, 0, canvas.height);
+                grad.addColorStop(0, neonPink);
+                grad.addColorStop(0.1, voidColor);
+                grad.addColorStop(1, '#000');
+                ctx.fillStyle = grad;
+                ctx.fillRect(t.x, groundY, 21, canvas.height - groundY);
+
+                // Top neon edge
+                ctx.fillStyle = neonCyan;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = neonCyan;
+                ctx.fillRect(t.x, groundY, 21, 3);
+                ctx.shadowBlur = 0;
+                
+                // Vertical grid lines
+                if (Math.round(t.x) % 40 < 20) {
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
+                    ctx.fillRect(t.x, groundY, 2, canvas.height - groundY);
+                }
+            } else {
+                // Glow spilling into the gap
+                let gapGrad = ctx.createLinearGradient(0, groundY, 0, groundY + 50);
+                gapGrad.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+                gapGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gapGrad;
+                ctx.fillRect(t.x, groundY, 21, 50);
+            }
+        });
+
+        // Background Chars
+        backgroundChars.forEach(c => {
+            const emoji = c.type === 'marvin' ? '🤖' : '🧙‍♂️';
+            const color = c.type === 'marvin' ? '#ffffff' : '#ff00ff';
+            ctx.save();
+            ctx.globalAlpha = 0.6;
+            drawGlowEmoji(emoji, c.x, c.y + Math.sin(c.float)*15, EMOJI_SIZE * 1.5, color, 30);
+            ctx.restore();
+        });
+
+        // Entities
+        entities.forEach(ent => {
+            let emoji = '🟦';
+            let glow = '#00ffff';
+            if (ent.type === 'vogon') { emoji = '👽'; glow = '#00ff00'; }
+            if (ent.type === 'tea') { emoji = '☕'; glow = '#ffff00'; }
+            if (ent.type === 'zaphod') { emoji = '👱‍♂️🛸'; glow = '#ff00ff'; }
+            
+            drawGlowEmoji(emoji, ent.x, ent.y, EMOJI_SIZE, glow, 20);
+        });
+
+        // Player
+        ctx.save();
+        if (player.statusEffect > 0) ctx.globalAlpha = 0.5 + Math.sin(frameCount) * 0.3; // Blink if slowed
+        drawGlowEmoji('🧑🏼', player.x, player.y, EMOJI_SIZE, '#ffffff', 15);
+        
+        // Ford's Towel (flapping behind)
+        ctx.save();
+        ctx.translate(player.x - 15, player.y + 20);
+        ctx.rotate(Math.sin(frameCount / 4) * 0.3); 
+        drawGlowEmoji('🟦', 0, 0, EMOJI_SIZE * 0.5, '#00ffff', 10);
+        ctx.restore();
+        
+        ctx.restore();
+
+        // Particles
+        particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = p.color;
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
+    }
+
+    function updateHUD() {
+        scoreDisplay.innerText = score;
+    }
+
+    function gameOver(reason) {
+        state = 'GAMEOVER';
+        screens.classList.remove('hidden');
+        screenTitle.innerText = "DON'T PANIC (OR DO)";
+        screenText.innerHTML = `${reason}<br><br>Final Score: <b style="color:#00ffff; text-shadow: 0 0 10px #00ffff;">${score}</b>`;
+        actionBtn.innerText = "TRY AGAIN";
+        marvinQuoteEl.style.opacity = 0;
+        draw();
+    }
+
+    function gameLoop() {
+        if (state === 'PLAYING') {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    }
+
+    // Initial stars and draw
+    initStars();
+    draw(); 
+
+</script>
+</body>
+</html>
